@@ -1,0 +1,160 @@
+groups:
+  - name: services
+    rules:
+      - alert: ServiceDown
+        expr: service_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} service is down"
+          description: "{{ $labels.service }} service has been down for more than 1 minute."
+          runbook_url: "https://your-runbook.com/{{ $labels.service }}-down"
+
+      - alert: ServiceHighResponseTime
+        expr: service_response_time_seconds > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} has high response time"
+          description: "{{ $labels.service }} response time is {{ $value }}s for more than 2 minutes."
+
+  - name: error_rates
+    rules:
+      - alert: HighErrorRate
+        expr: http_error_rate > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }}% for service {{ $labels.service }}"
+          runbook_url: "https://your-runbook.com/high-error-rate"
+
+      - alert: CriticalErrorRate
+        expr: http_error_rate > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value }}% for service {{ $labels.service }}"
+          runbook_url: "https://your-runbook.com/critical-error-rate"
+
+      - alert: HighVolumeErrors
+        expr: increase(http_errors_total[5m]) > 1000 and rate(http_requests_total[5m]) > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High volume of errors during traffic spike"
+          description: "{{ $value }} errors in the last 5 minutes during high traffic"
+
+      - alert: MassiveErrorSpike
+        expr: increase(http_errors_total[1m]) > 500
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Massive error spike detected"
+          description: "{{ $value }} errors in the last minute"
+
+  - name: traffic_patterns
+    rules:
+      - alert: HighTrafficErrorRate
+        expr: (rate(http_errors_total[5m]) / rate(http_requests_total[5m])) * 100 > 5 and rate(http_requests_total[5m]) > 333
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate during traffic spike"
+          description: "Error rate is {{ $value }}% with {{ $labels.service }} receiving high traffic (>100k requests/5min)"
+
+      - alert: ResponseTimeSpike
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile response time is high"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.service }}"
+
+  - name: redis
+    rules:
+      - alert: RedisDown
+        expr: service_up{service="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis service is not responding. This may affect caching and session storage."
+          runbook_url: "https://your-runbook.com/redis-down"
+
+      - alert: RedisHighResponseTime
+        expr: service_response_time_seconds{service="redis"} > 2
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis has high response time"
+          description: "Redis response time is {{ $value }}s, which may indicate performance issues."
+
+      - alert: RedisRecovered
+        expr: service_up{service="redis"} == 1
+        for: 30s
+        labels:
+          severity: info
+          service: redis
+        annotations:
+          summary: "Redis has recovered"
+          description: "Redis service is now responding normally."
+
+  - name: rabbitmq
+    rules:
+      - alert: RabbitMQDown
+        expr: service_up{service="rabbitmq"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ service is not responding. Message queuing is affected."
+          runbook_url: "https://your-runbook.com/rabbitmq-down"
+
+      - alert: RabbitMQHighResponseTime
+        expr: service_response_time_seconds{service="rabbitmq"} > 3
+        for: 1m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ has high response time"
+          description: "RabbitMQ response time is {{ $value }}s, which may indicate queue buildup."
+
+  - name: postgres
+    rules:
+      - alert: PostgresDown
+        expr: service_up{service="postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL service is not responding. Database operations are affected."
+          runbook_url: "https://your-runbook.com/postgres-down"
+
+      - alert: PostgresHighResponseTime
+        expr: service_response_time_seconds{service="postgres"} > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PostgreSQL has high response time"
+          description: "PostgreSQL response time is {{ $value }}s, which may indicate slow queries or high load."

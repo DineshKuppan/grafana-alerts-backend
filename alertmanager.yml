@@ -1,0 +1,153 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'monitoring@example.com'
+  slack_api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+    - match:
+        service: redis
+      receiver: 'redis-alerts'
+    - match:
+        service: rabbitmq
+      receiver: 'service-alerts'
+    - match:
+        service: postgres
+      receiver: 'service-alerts'
+
+receivers:
+  - name: 'default'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+        channel: '#monitoring'
+        username: 'AlertManager'
+        icon_emoji: ':warning:'
+        title: 'Monitoring Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+        channel: '#alerts-critical'
+        username: 'AlertManager'
+        icon_emoji: ':rotating_light:'
+        title: 'CRITICAL ALERT'
+        color: 'danger'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          *Status:* {{ .Status }}
+          {{ end }}
+        send_resolved: true
+        actions:
+          - type: button
+            text: 'View Grafana Dashboard'
+            url: 'http://localhost:3000/d/services-monitoring'
+          - type: button
+            text: 'View Prometheus'
+            url: 'http://localhost:9090'
+    email_configs:
+      - to: 'admin@example.com'
+        subject: 'CRITICAL: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}: {{ .Value }}{{ end }}
+          {{ end }}
+
+  - name: 'redis-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+        channel: '#redis-alerts'
+        username: 'Redis Monitor'
+        icon_emoji: ':redis:'
+        title: 'Redis Service Alert'
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        text: |
+          {{ if eq .Status "firing" }}
+          🚨 *REDIS DOWN* 🚨
+          {{ else }}
+          ✅ *REDIS RECOVERED* ✅
+          {{ end }}
+          
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+        actions:
+          - type: button
+            text: 'Check Redis Status'
+            url: 'http://localhost:3001/status'
+          - type: button
+            text: 'View Metrics'
+            url: 'http://localhost:3000/d/services-monitoring'
+          - type: button
+            text: 'Redis Management'
+            url: 'http://localhost:15672'
+
+  - name: 'service-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+        channel: '#service-alerts'
+        username: 'Service Monitor'
+        icon_emoji: ':gear:'
+        title: 'Service Alert'
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+        text: |
+          {{ if eq .Status "firing" }}
+          ⚠️ *SERVICE ISSUE* ⚠️
+          {{ else }}
+          ✅ *SERVICE RECOVERED* ✅
+          {{ end }}
+          
+          {{ range .Alerts }}
+          *Service:* {{ .Labels.service }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+        send_resolved: true
+        actions:
+          - type: button
+            text: 'Check All Services'
+            url: 'http://localhost:3001/health'
+          - type: button
+            text: 'View Dashboard'
+            url: 'http://localhost:3000/d/services-monitoring'
+
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/12341234134/123412341234/143134123412'
+        channel: '#monitoring-warnings'
+        username: 'Monitor'
+        icon_emoji: ':warning:'
+        title: 'Warning Alert'
+        color: 'warning'
+        text: |
+          ⚠️ *WARNING* ⚠️
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+        send_resolved: true
